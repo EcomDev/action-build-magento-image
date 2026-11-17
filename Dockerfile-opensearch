@@ -1,0 +1,6 @@
+ARG SOURCE_VERSION
+
+FROM ghcr.io/wardenenv/opensearch:${SOURCE_VERSION}
+
+RUN rm -rf /usr/share/opensearch/data
+COPY --chown=opensearch:opensearch search/ /usr/share/opensearch/data
