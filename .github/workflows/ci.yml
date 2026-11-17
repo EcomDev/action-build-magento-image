@@ -1,0 +1,67 @@
+name: Verify Action
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      builds: ${{ steps.matrix.outputs.builds }}
+      images: ${{ steps.matrix.outputs.images }}
+    steps:
+      - name: Generate Magento Version Matrix for Data Artifacts
+        uses: ecomdev/action-build-magento-matrix@v1.0.1
+        id: matrix
+        with:
+          months: 12
+          sample-data: 'true'
+          include-prerelease: 'true'
+  build-magento:
+    runs-on: ubuntu-latest
+    needs: generate-matrix
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.generate-matrix.outputs.builds) }}
+    steps:
+      - uses: ecomdev/action-build-magento-data-artifact@v1.3.0
+        id: build
+        with:
+          name: '${{ matrix.name }}'
+          auth: '${{ secrets.COMPOSER_AUTH }}'
+          meta-package: 'magento/project-community-edition'
+          magento-version: '${{ matrix.magentoVersion }}'
+          stability: '${{ matrix.stability }}'
+          mariadb-version: '${{ matrix.mariaDbVersion }}'
+          opensearch-version: '${{ matrix.openSearchVersion }}'
+          php-version: '${{ matrix.phpVersion }}'
+          sample-data: ${{ cases(matrix.sampleData, 'true', 'false') }}
+          token: '${{ github.token }}'
+  build-container:
+    runs-on: ubuntu-latest
+    needs: [ generate-matrix, build-magento ]
+    continue-on-error: ${{ matrix.stability != 'stable' }}
+    permissions:
+      packages: read
+      contents: read
+      attestations: read
+      id-token: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.generate-matrix.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build linux/amd64 and linux/arm64 version of Docker image
+        uses: ./
+        with:
+          artifact: ${{ matrix.artifact }}
+          containerType: ${{ matrix.containerType }}
+          imageName: ${{ github.repository }}/${{ matrix.containerType }}
+          imageTags: ${{ matrix.tag }}
+          version: ${{ matrix.version }}
+          push: 'false'
+          platforms: 'linux/amd64,linux/arm64'
