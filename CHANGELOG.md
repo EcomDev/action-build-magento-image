@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/EcomDev/action-build-magento-image/compare/v1.0.0...v1.0.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* move attestations to docker build action ([5c41c1c](https://github.com/EcomDev/action-build-magento-image/commit/5c41c1cddc8ddebba8aacf6f67330de2cf35302e))
+* pin version for external actions ([1000ac5](https://github.com/EcomDev/action-build-magento-image/commit/1000ac5b8c8e6180a9261e6a11db89c3345ed914))
+
 ## 1.0.0 (2026-11-18)
 
 
