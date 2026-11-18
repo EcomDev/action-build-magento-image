@@ -30,7 +30,6 @@ jobs:
       - uses: ecomdev/action-build-magento-data-artifact@v1.4.0
         id: build
         with:
-          cache-artifact: 'false'
           name: '${{ matrix.name }}'
           auth: '${{ secrets.COMPOSER_AUTH }}'
           repository: 'https://repo.magento.com/'
