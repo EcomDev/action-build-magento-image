@@ -1,6 +1,9 @@
 name: Build Docker Image Based on Provided Data Artifact
 description: Generates single database version per Magento release for both MariaDB and MySQL
 author: Ivan Chepurnyi <ivan@ecom.dev>
+branding:
+  icon: image
+  color: purple
 inputs:
   artifact:
     required: true
