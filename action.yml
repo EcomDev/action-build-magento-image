@@ -81,6 +81,7 @@ runs:
       id: build-and-push
       uses: docker/build-push-action@v7
       with:
+        provenance: mode=max
         context: artifact/
         file: ${{ github.action_path  }}/Dockerfile-${{ inputs.containerType }}
         push: ${{ inputs.push != 'false' }}
@@ -90,11 +91,3 @@ runs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: SOURCE_VERSION=${{ inputs.version }}
-    - name: Attest
-      if: ${{ inputs.push != 'false' }}
-      uses: actions/attest@v4
-      id: attest
-      with:
-        subject-name:  ${{ inputs.registry }}/${{ inputs.imageName }}
-        subject-digest: ${{ steps.push.outputs.digest }}
-        push-to-registry: true
