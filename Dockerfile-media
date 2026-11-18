@@ -1,4 +1,4 @@
 # Keep source argument for backward compatibility
 ARG SOURCE_VERSION
 FROM scratch
-COPY --chown=1000:1000 --chmod media/ /
+COPY --chown=1000:1000 --chmod 0777 media/ /
