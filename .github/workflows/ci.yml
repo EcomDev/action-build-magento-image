@@ -32,6 +32,7 @@ jobs:
         with:
           name: '${{ matrix.name }}'
           auth: '${{ secrets.COMPOSER_AUTH }}'
+          repository: 'https://repo.magento.com/'
           meta-package: 'magento/project-community-edition'
           magento-version: '${{ matrix.magentoVersion }}'
           stability: '${{ matrix.stability }}'
