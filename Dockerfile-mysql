@@ -1,32 +1,28 @@
-ARG SOURCE_VERSION
+# check=skip=SecretsUsedInArgOrEnv
+ARG SOURCE_VERSION=8.4
 
-FROM ghcr.io/wardenenv/mysql:${SOURCE_VERSION} as mysql-setup
+FROM ghcr.io/wardenenv/mysql:${SOURCE_VERSION} AS mysql-setup
 
-ENV MYSQL_DATABASE magento
-ENV MYSQL_PASSWORD magento
-ENV MYSQL_ROOT_PASSWORD magento
-ENV MYSQL_USER magento
-ENV MYSQL_INIT_ONLY 1
+ENV MYSQL_DATABASE=magento \
+    MYSQL_PASSWORD=magento \
+    MYSQL_ROOT_PASSWORD=magento \
+    MYSQL_USER=magento
 
 USER root
 # Prevent executing server on build run
 RUN ["sed", "-i", "s/exec \\\"$@\\\"/ /", "/usr/local/bin/docker-entrypoint.sh"]
-RUN /usr/bin/install -m 0775 -o mysql -g root -d /setup/
+RUN /usr/bin/install -m 0750 -o mysql -g mysql -d /setup/db
 USER mysql
 
-COPY *.sql /docker-entrypoint-initdb.d/
+COPY *.sql* /docker-entrypoint-initdb.d/
 
-RUN ["docker-entrypoint.sh", "mysqld"]
+RUN ["docker-entrypoint.sh", "mysqld", "--datadir=/setup/db", "--skip-log-bin", "--max-allowed-packet=1024M"]
 
-USER root
-RUN mv /var/lib/mysql /setup/db
-USER mysql
+FROM ghcr.io/wardenenv/mysql:${SOURCE_VERSION}
 
-FROM wardenenv/mysql:${SOURCE_VERSION}
-
-ENV MYSQL_DATABASE magento
-ENV MYSQL_PASSWORD magento
-ENV MYSQL_ROOT_PASSWORD magento
-ENV MYSQL_USER magento
+ENV MYSQL_DATABASE=magento \
+    MYSQL_PASSWORD=magento \
+    MYSQL_ROOT_PASSWORD=magento \
+    MYSQL_USER=magento
 
 COPY --from=mysql-setup /setup/db /var/lib/mysql
