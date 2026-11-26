@@ -45,6 +45,7 @@ EOF
       ;;
     mysql)
       cat <<'EOF' >> /etc/mysql/conf.d/zz-testcontainer.cnf
+basedir=/usr
 skip-log-bin
 loose-innodb-redo-log-capacity=8M
 EOF
@@ -147,6 +148,15 @@ prepare_build_init() {
   # Prevent docker-entrypoint.sh from exec'ing the server after build-time DB initialization
   sed -i 's/exec "$@"/ /' /usr/local/bin/docker-entrypoint.sh
   install -m 0750 -o mysql -g mysql -d "${SETUP_DATA_DIR}"
+
+  # On Ubuntu hosts (e.g. GitHub Actions), BuildKit's unconfined docker-container
+  # driver attaches the host's /etc/apparmor.d/usr.sbin.mysqld profile whenever
+  # /usr/sbin/mysqld is executed by path, blocking /setup/db and /usr/share/mysql-8.x.
+  # Shadowing it earlier in PATH (with basedir=/usr in zz-testcontainer.cnf) avoids
+  # path-based AppArmor attachment during build-time initialization.
+  if [[ "${ENGINE}" == "mysql" ]]; then
+    cp -a "${SERVER_BIN}" /usr/local/sbin/mysqld
+  fi
 }
 
 write_testcontainer_config
