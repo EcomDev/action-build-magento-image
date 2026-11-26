@@ -124,7 +124,7 @@ start_temp_server() {
         --expire-logs-days=0 \
         --skip-slave-start \
         --loose-innodb_buffer_pool_load_at_startup=0 \
-        --skip-ssl --ssl-cert='' --ssl-key='' --ssl-ca='' &
+        --skip-ssl &
       SERVER_PID=$!
 
       local attempt
