@@ -2,15 +2,14 @@
 set -euo pipefail
 shopt -s nullglob
 
-# Prepares a MariaDB or MySQL builder stage for a minimal `FROM scratch` testcontainer:
+# Prepares a minimal /rootfs in a MariaDB or MySQL target-arch stage for a `FROM scratch` testcontainer:
 #   1. Writes an ephemeral testcontainer config (/etc/mysql/conf.d/zz-testcontainer.cnf)
-#   2. Assembles a minimal /rootfs containing only the DB server binary, /usr/bin/env,
+#   2. Assembles a minimal /rootfs containing only the DB server binary, /bin/sh, /usr/bin/env,
 #      required shared libraries, minimal user/group files, configs, and charsets/messages
-#   3. Patches docker-entrypoint.sh to exit after initialization and creates /setup/db
 
 ENGINE="${1:-}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOTFS_DIR="/rootfs"
-SETUP_DATA_DIR="/setup/db"
 
 case "${ENGINE}" in
   mariadb)
@@ -24,34 +23,6 @@ case "${ENGINE}" in
     exit 1
     ;;
 esac
-
-write_testcontainer_config() {
-  mkdir -p /etc/mysql/conf.d
-
-  cat <<'EOF' > /etc/mysql/conf.d/zz-testcontainer.cnf
-[mysqld]
-skip-name-resolve
-max_allowed_packet=1024M
-innodb_doublewrite=0
-innodb_flush_log_at_trx_commit=2
-EOF
-
-  case "${ENGINE}" in
-    mariadb)
-      cat <<'EOF' >> /etc/mysql/conf.d/zz-testcontainer.cnf
-innodb_log_file_size=8M
-aria_log_file_size=8M
-EOF
-      ;;
-    mysql)
-      cat <<'EOF' >> /etc/mysql/conf.d/zz-testcontainer.cnf
-basedir=/usr
-skip-log-bin
-loose-innodb-redo-log-capacity=8M
-EOF
-      ;;
-  esac
-}
 
 copy_to_rootfs() {
   local src="$1"
@@ -145,21 +116,5 @@ assemble_rootfs() {
   done
 }
 
-prepare_build_init() {
-  # Prevent docker-entrypoint.sh from exec'ing the server after build-time DB initialization
-  sed -i 's/exec "$@"/ /' /usr/local/bin/docker-entrypoint.sh
-  install -m 0750 -o mysql -g mysql -d "${SETUP_DATA_DIR}"
-
-  # On Ubuntu hosts (e.g. GitHub Actions), BuildKit's unconfined docker-container
-  # driver attaches the host's /etc/apparmor.d/usr.sbin.mysqld profile whenever
-  # /usr/sbin/mysqld is executed by path, blocking /setup/db and /usr/share/mysql-8.x.
-  # Shadowing it earlier in PATH (with basedir=/usr in zz-testcontainer.cnf) avoids
-  # path-based AppArmor attachment during build-time initialization.
-  if [[ "${ENGINE}" == "mysql" ]]; then
-    cp -a "${SERVER_BIN}" /usr/local/sbin/mysqld
-  fi
-}
-
-write_testcontainer_config
+"${SCRIPT_DIR}/write-db-config.sh" "${ENGINE}"
 assemble_rootfs
-prepare_build_init

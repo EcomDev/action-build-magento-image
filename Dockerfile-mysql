@@ -1,22 +1,19 @@
 # check=skip=SecretsUsedInArgOrEnv
 ARG SOURCE_VERSION=8.4
 
-FROM ghcr.io/wardenenv/mysql:${SOURCE_VERSION} AS mysql-setup
-
-ENV MYSQL_DATABASE=magento \
-    MYSQL_PASSWORD=magento \
-    MYSQL_ROOT_PASSWORD=magento \
-    MYSQL_USER=magento \
-    MYSQL_INITDB_SKIP_TZINFO=1
+FROM ghcr.io/wardenenv/mysql:${SOURCE_VERSION} AS mysql-rootfs
 
 USER root
-COPY --from=scripts --chmod=0755 prepare-db-rootfs.sh /tmp/prepare-db-rootfs.sh
+COPY --from=scripts --chmod=0755 write-db-config.sh prepare-db-rootfs.sh /tmp/
 RUN ["/tmp/prepare-db-rootfs.sh", "mysql"]
-USER mysql
 
+FROM --platform=$BUILDPLATFORM ghcr.io/wardenenv/mysql:${SOURCE_VERSION} AS mysql-init
+
+USER root
+COPY --from=scripts --chmod=0755 write-db-config.sh init-db.sh /tmp/
 COPY *.sql* /docker-entrypoint-initdb.d/
 
-RUN ["docker-entrypoint.sh", "mysqld", "--datadir=/setup/db", "--innodb-fast-shutdown=0"]
+RUN ["/tmp/init-db.sh", "mysql"]
 
 FROM scratch
 
@@ -26,9 +23,9 @@ ENV PATH=/usr/sbin:/usr/bin:/sbin:/bin \
     MYSQL_ROOT_PASSWORD=magento \
     MYSQL_USER=magento
 
-COPY --from=mysql-setup /rootfs /
+COPY --from=mysql-rootfs /rootfs /
 COPY --from=scripts --chmod=0755 db-entrypoint.sh /usr/local/bin/db-entrypoint.sh
-COPY --from=mysql-setup --chown=mysql:mysql /setup/db /var/lib/mysql
+COPY --from=mysql-init --chown=mysql:mysql /setup/db /var/lib/mysql
 
 USER mysql
 EXPOSE 3306
