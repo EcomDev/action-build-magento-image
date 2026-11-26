@@ -24,21 +24,23 @@ The `containerType` input selects which Dockerfile is built from the artifact da
 
 | `containerType` | Base Image | Embedded Data | Notes |
 | --- | --- | --- | --- |
-| `mariadb` | `scratch` *(built from `ghcr.io/wardenenv/mariadb:<version>`)* | `/var/lib/mysql` | Minimal server-only image containing `mariadbd`, required shared libraries, `env`, and pre-initialized `/var/lib/mysql` (no shell, client tools, or anonymous `VOLUME`). |
-| `mysql` | `scratch` *(built from `ghcr.io/wardenenv/mysql:<version>`)* | `/var/lib/mysql` | Minimal server-only image containing `mysqld`, required shared libraries, `env`, and pre-initialized `/var/lib/mysql` (no shell, `mysql-shell`, client tools, or anonymous `VOLUME`). |
+| `mariadb` | `scratch` *(built from `ghcr.io/wardenenv/mariadb:<version>`)* | `/var/lib/mysql` | Minimal server-only image containing `mariadbd`, required shared libraries, a minimal `/bin/sh` entrypoint, `env`, and pre-initialized `/var/lib/mysql` (no client tools or anonymous `VOLUME`). |
+| `mysql` | `scratch` *(built from `ghcr.io/wardenenv/mysql:<version>`)* | `/var/lib/mysql` | Minimal server-only image containing `mysqld`, required shared libraries, a minimal `/bin/sh` entrypoint, `env`, and pre-initialized `/var/lib/mysql` (no `mysql-shell`, client tools, or anonymous `VOLUME`). |
 | `opensearch` | `ghcr.io/wardenenv/opensearch:<version>` | `/usr/share/opensearch/data` | Replaces the OpenSearch data directory with the pre-indexed `search/` directory (`opensearch:opensearch`). Gracefully skipped (`skipped: 'true'`) when `version` is omitted/`'none'` or `search.tgz` is absent. |
 | `media` | `scratch` | `/` | Minimal data-only image containing unpacked `media/` files with ownership `1000:1000` and permissions `0777`. `version` is optional. |
 
-### Pre-Configured Database Credentials (`mariadb` and `mysql`)
+### Database Runtime Environment Variables (`mariadb` and `mysql`)
 
-Both database container images come pre-configured with the following default environment variables:
+Both database container images come pre-configured with default credentials and optional runtime settings:
 
-| Environment Variable | Value |
-| --- | --- |
-| `MYSQL_DATABASE` | `magento` |
-| `MYSQL_USER` | `magento` |
-| `MYSQL_PASSWORD` | `magento` |
-| `MYSQL_ROOT_PASSWORD` | `magento` |
+| Environment Variable | Default | Description |
+| --- | --- | --- |
+| `MYSQL_DATABASE` | `magento` | Pre-initialized Magento database name. |
+| `MYSQL_USER` | `magento` | Pre-configured Magento database user. |
+| `MYSQL_PASSWORD` | `magento` | Password for `MYSQL_USER`. |
+| `MYSQL_ROOT_PASSWORD` | `magento` | Password for `root`. |
+| `MYSQL_ENABLE_BINLOG` | `0` | Set to `1` at container startup to enable binary logging in `ROW` / `FULL` format (`--log-bin=mysql-bin --binlog-format=ROW --binlog-row-image=FULL`). |
+| `MYSQL_SERVER_ID` | `1` | Server ID passed via `--server-id` when `MYSQL_ENABLE_BINLOG` is enabled. |
 
 ## Expected Data Artifact Contents
 

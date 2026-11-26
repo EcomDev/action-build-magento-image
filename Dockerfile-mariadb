@@ -25,9 +25,10 @@ ENV PATH=/usr/sbin:/usr/bin:/sbin:/bin \
     MYSQL_USER=magento
 
 COPY --from=mariadb-setup /rootfs /
+COPY --from=scripts --chmod=0755 db-entrypoint.sh /usr/local/bin/db-entrypoint.sh
 COPY --from=mariadb-setup --chown=mysql:mysql /setup/db /var/lib/mysql
 
 USER mysql
 EXPOSE 3306
 
-ENTRYPOINT ["mariadbd"]
+ENTRYPOINT ["/usr/local/bin/db-entrypoint.sh", "mariadbd"]

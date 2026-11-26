@@ -171,52 +171,10 @@ jobs:
       - name: Smoke test built database and OpenSearch containers
         shell: bash
         run: |
-          set -euo pipefail
-          IMAGE_PREFIX=$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
-          NET_NAME="smoke-test-net-${GITHUB_RUN_ID}"
-
-          docker network create "${NET_NAME}"
-          MARIADB_ID=$(docker run -d --rm --network "${NET_NAME}" --network-alias mariadb-smoke "${IMAGE_PREFIX}/mariadb:smoke-test")
-          MYSQL_ID=$(docker run -d --rm --network "${NET_NAME}" --network-alias mysql-smoke "${IMAGE_PREFIX}/mysql:smoke-test")
-          OPENSEARCH_ID=$(docker run -d --rm -e discovery.type=single-node -e DISABLE_SECURITY_PLUGIN=true "${IMAGE_PREFIX}/opensearch:smoke-test")
-          trap 'docker stop "$MARIADB_ID" "$MYSQL_ID" "$OPENSEARCH_ID" >/dev/null 2>&1 || true; docker network rm "${NET_NAME}" >/dev/null 2>&1 || true' EXIT
-
-          for pair in "MariaDB:${MARIADB_ID}" "MySQL:${MYSQL_ID}"; do
-            label="${pair%%:*}"
-            cid="${pair#*:}"
-            ready=0
-            for i in {1..30}; do
-              if docker logs "${cid}" 2>&1 1>/dev/null | grep -q "ready for connections"; then
-                ready=1
-                break
-              fi
-              sleep 1
-            done
-            if [ "${ready}" -ne 1 ]; then
-              echo "::error::${label} container did not report 'ready for connections' on stderr"
-              docker logs "${cid}"
-              exit 1
-            fi
-            test "$(docker inspect --format '{{json .Mounts}}' "${cid}")" = "[]"
-            docker exec "${cid}" env | grep -q "^MYSQL_DATABASE=magento$"
-          done
-
-          docker run --rm --network "${NET_NAME}" --entrypoint bash ghcr.io/wardenenv/mariadb:11.8 -c '
-            set -euo pipefail
-            mariadb -hmariadb-smoke -umagento -pmagento --skip-ssl -Nse "SELECT COUNT(*) FROM store" magento
-            mariadb -hmariadb-smoke -umagento -pmagento --skip-ssl -e "CREATE TABLE _smoke (id INT PRIMARY KEY); INSERT INTO _smoke VALUES (1); DROP TABLE _smoke;" magento
-          '
-          docker run --rm --network "${NET_NAME}" --entrypoint bash ghcr.io/wardenenv/mysql:8.4 -c '
-            set -euo pipefail
-            mysql -hmysql-smoke -umagento -pmagento -Nse "SELECT COUNT(*) FROM store" magento
-            mysql -hmysql-smoke -umagento -pmagento -e "CREATE TABLE _smoke (id INT PRIMARY KEY); INSERT INTO _smoke VALUES (1); DROP TABLE _smoke;" magento
-          '
-
-          for i in {1..30}; do
-            docker exec "$OPENSEARCH_ID" curl -fsS "http://127.0.0.1:9200/_cat/indices/magento2*" >/dev/null 2>&1 && break
-            sleep 2
-          done
-          docker exec "$OPENSEARCH_ID" curl -fsS "http://127.0.0.1:9200/_cat/indices/magento2*"
+          ./tests/smoke-test.sh \
+            "ghcr.io/${{ github.repository }}" \
+            "smoke-test" \
+            "smoke-test-net-${{ github.run_id }}"
 
       - name: Prepare dump directory without OpenSearch data
         id: dump-no-opensearch

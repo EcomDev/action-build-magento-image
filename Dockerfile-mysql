@@ -27,9 +27,10 @@ ENV PATH=/usr/sbin:/usr/bin:/sbin:/bin \
     MYSQL_USER=magento
 
 COPY --from=mysql-setup /rootfs /
+COPY --from=scripts --chmod=0755 db-entrypoint.sh /usr/local/bin/db-entrypoint.sh
 COPY --from=mysql-setup --chown=mysql:mysql /setup/db /var/lib/mysql
 
 USER mysql
 EXPOSE 3306
 
-ENTRYPOINT ["mysqld"]
+ENTRYPOINT ["/usr/local/bin/db-entrypoint.sh", "mysqld"]

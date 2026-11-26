@@ -102,8 +102,9 @@ assemble_rootfs() {
     chmod 0750 "${ROOTFS_DIR}/var/lib/mysql-files"
   fi
 
-  # Copy database server binary and /usr/bin/env (used by testcontainers to read MYSQL_* env)
+  # Copy database server binary, /bin/sh (for runtime entrypoint), and /usr/bin/env (for testcontainers)
   copy_binary_with_libs "${SERVER_BIN}"
+  copy_binary_with_libs "/bin/sh"
   copy_binary_with_libs "/usr/bin/env"
 
   # Copy NSS file backend so glibc can resolve the mysql user from /etc/passwd and /etc/group
