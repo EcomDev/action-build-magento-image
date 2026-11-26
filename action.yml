@@ -53,6 +53,14 @@ inputs:
     required: false
     description: Platforms Docker Image build
     default: linux/amd64,linux/arm64
+  compression:
+    required: false
+    default: zstd
+    description: OCI layer compression algorithm when pushing images (zstd, gzip, estargz, or uncompressed)
+  compressionLevel:
+    required: false
+    default: '9'
+    description: Compression level when pushing images (0-22 for zstd, 0-9 for gzip/estargz)
 outputs:
   skipped:
     description: Whether the image build was skipped (e.g. optional OpenSearch without version or search.tgz)
@@ -80,7 +88,10 @@ runs:
           "${{ inputs.artifactId }}" \
           "${{ inputs.artifactPath }}" \
           "${{ inputs.cache }}" \
-          "${{ inputs.load }}"
+          "${{ inputs.load }}" \
+          "${{ inputs.push }}" \
+          "${{ inputs.compression }}" \
+          "${{ inputs.compressionLevel }}"
 
     - name: Download artifact by ID
       if: steps.prepare.outputs.skip != 'true' && inputs.artifactPath == '' && inputs.artifactId != ''
@@ -141,8 +152,8 @@ runs:
         context: ${{ steps.prepare.outputs.context_dir }}
         build-contexts: scripts=${{ github.action_path }}/scripts
         file: ${{ github.action_path }}/Dockerfile-${{ inputs.containerType }}
-        push: ${{ inputs.push != 'false' }}
         load: ${{ inputs.load != 'false' }}
+        outputs: ${{ steps.prepare.outputs.outputs }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         platforms: ${{ inputs.platforms }}

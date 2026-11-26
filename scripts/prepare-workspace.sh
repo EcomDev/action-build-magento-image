@@ -5,7 +5,7 @@ set -euo pipefail
 # and BuildKit options for Docker image builds.
 #
 # Usage:
-#   prepare-workspace.sh <container_type> <version> <artifact_name> <artifact_id> <artifact_path> [enable_cache] [load_image]
+#   prepare-workspace.sh <container_type> <version> <artifact_name> <artifact_id> <artifact_path> [enable_cache] [load_image] [push_image] [compression] [compression_level]
 
 CONTAINER_TYPE="${1:-}"
 VERSION="${2:-}"
@@ -14,6 +14,9 @@ ARTIFACT_ID="${4:-}"
 ARTIFACT_PATH="${5:-}"
 ENABLE_CACHE="${6:-false}"
 LOAD_IMAGE="${7:-false}"
+PUSH_IMAGE="${8:-false}"
+COMPRESSION="${9:-zstd}"
+COMPRESSION_LEVEL="${10:-9}"
 
 WORK_DIR=""
 SOURCE_DIR=""
@@ -21,6 +24,7 @@ CONTEXT_DIR=""
 CACHE_FROM=""
 CACHE_TO=""
 PROVENANCE=""
+OUTPUTS=""
 
 write_output() {
   echo "$1=$2" >> "${GITHUB_OUTPUT}"
@@ -34,6 +38,35 @@ validate_container_type() {
       exit 1
       ;;
   esac
+}
+
+validate_compression() {
+  case "${COMPRESSION}" in
+    zstd|gzip|estargz|uncompressed) ;;
+    *)
+      echo "::error::Unsupported compression '${COMPRESSION}'. Expected one of: zstd, gzip, estargz, uncompressed."
+      exit 1
+      ;;
+  esac
+
+  if [[ "${COMPRESSION}" == "uncompressed" || -z "${COMPRESSION_LEVEL}" ]]; then
+    return 0
+  fi
+
+  if [[ ! "${COMPRESSION_LEVEL}" =~ ^[0-9]+$ ]]; then
+    echo "::error::Invalid compressionLevel '${COMPRESSION_LEVEL}'. Expected a non-negative integer."
+    exit 1
+  fi
+
+  local max_level=9
+  if [[ "${COMPRESSION}" == "zstd" ]]; then
+    max_level=22
+  fi
+
+  if (( 10#${COMPRESSION_LEVEL} > max_level )); then
+    echo "::error::Invalid compressionLevel '${COMPRESSION_LEVEL}' for '${COMPRESSION}'. Expected 0-${max_level}."
+    exit 1
+  fi
 }
 
 should_skip_optional_build() {
@@ -84,10 +117,23 @@ configure_build_options() {
   else
     PROVENANCE="mode=max"
   fi
+
+  if [[ "${PUSH_IMAGE}" != "false" ]]; then
+    OUTPUTS="type=registry,compression=${COMPRESSION},force-compression=true"
+    if [[ "${COMPRESSION}" != "uncompressed" && -n "${COMPRESSION_LEVEL}" ]]; then
+      OUTPUTS="${OUTPUTS},compression-level=${COMPRESSION_LEVEL}"
+    fi
+    if [[ "${COMPRESSION}" == "zstd" || "${COMPRESSION}" == "estargz" ]]; then
+      OUTPUTS="${OUTPUTS},oci-mediatypes=true"
+    fi
+  else
+    OUTPUTS=""
+  fi
 }
 
 main() {
   validate_container_type
+  validate_compression
 
   if should_skip_optional_build; then
     echo "::notice::Skipping OpenSearch image build because 'version' is not specified."
@@ -107,6 +153,7 @@ main() {
   write_output "cache_from" "${CACHE_FROM}"
   write_output "cache_to" "${CACHE_TO}"
   write_output "provenance" "${PROVENANCE}"
+  write_output "outputs" "${OUTPUTS}"
 }
 
 main

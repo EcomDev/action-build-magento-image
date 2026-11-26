@@ -16,7 +16,7 @@ During execution, this action:
 3. Sets up QEMU ([`docker/setup-qemu-action@v4.4.0`](https://github.com/docker/setup-qemu-action)) and Docker Buildx ([`docker/setup-buildx-action@v4.4.1`](https://github.com/docker/setup-buildx-action)) for multi-platform image builds.
 4. Logs into the target container registry (`registry`, default `ghcr.io`) via [`docker/login-action@v4.8.0`](https://github.com/docker/login-action) when `push` is enabled.
 5. Extracts OCI image tags and labels via [`docker/metadata-action@v6.2.0`](https://github.com/docker/metadata-action).
-6. Builds (and optionally pushes or loads) the container image via [`docker/build-push-action@v7.4.0`](https://github.com/docker/build-push-action) using `Dockerfile-<containerType>`, BuildKit SLSA provenance (`provenance: mode=max` when `load` is `'false'`), optional GitHub Actions cache (`cache`), and build argument `SOURCE_VERSION=<version>`, then cleans up the temporary workspace.
+6. Builds (and optionally pushes or loads) the container image via [`docker/build-push-action@v7.4.0`](https://github.com/docker/build-push-action) using `Dockerfile-<containerType>`, `zstd` OCI layer compression when pushing (`compression` / `compressionLevel`), BuildKit SLSA provenance (`provenance: mode=max` when `load` is `'false'`), optional GitHub Actions cache (`cache`), and build argument `SOURCE_VERSION=<version>`, then cleans up the temporary workspace.
 
 ## Supported Container Types
 
@@ -267,6 +267,8 @@ One of `artifact`, `artifactId`, or `artifactPath` must be provided.
 | `load` | No | `'false'` | Load the built single-platform image into the local Docker daemon (`platforms` must specify a single platform such as `linux/amd64`). |
 | `cache` | No | `'false'` | Enable GitHub Actions BuildKit layer caching (`type=gha,mode=max`) when set to any value other than `'false'`. |
 | `platforms` | No | `linux/amd64,linux/arm64` | Comma-separated list of target OCI platforms for Docker Buildx. |
+| `compression` | No | `zstd` | OCI layer compression algorithm used when pushing images (`zstd`, `gzip`, `estargz`, or `uncompressed`). `zstd` and `estargz` enable `oci-mediatypes=true` and `force-compression=true`. |
+| `compressionLevel` | No | `'9'` | Compression level used when pushing images (`0`–`22` for `zstd`, `0`–`9` for `gzip`/`estargz`; ignored for `uncompressed`). |
 
 ## Outputs
 
