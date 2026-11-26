@@ -89,7 +89,7 @@ jobs:
     needs: build-artifact
     steps:
       - name: Build and Push MariaDB Data Image
-        uses: ecomdev/action-build-magento-image@v1.0.1
+        uses: ecomdev/action-build-magento-image@v2.0.0
         with:
           artifactId: ${{ needs.build-artifact.outputs.artifact-id }}
           containerType: mariadb
@@ -160,7 +160,7 @@ jobs:
           config-file: ${{ steps.init.outputs.config-file }}
 
       - name: Build and Push MariaDB Image
-        uses: ecomdev/action-build-magento-image@v1.0.1
+        uses: ecomdev/action-build-magento-image@v2.0.0
         with:
           artifactPath: ${{ steps.dump.outputs.output-directory }}
           containerType: mariadb
@@ -234,7 +234,7 @@ jobs:
         include: ${{ fromJson(needs.generate-matrix.outputs.images) }}
     steps:
       - name: Build ${{ matrix.containerType }} Image (${{ matrix.artifact }})
-        uses: ecomdev/action-build-magento-image@v1.0.1
+        uses: ecomdev/action-build-magento-image@v2.0.0
         with:
           artifact: ${{ matrix.artifact }}
           containerType: ${{ matrix.containerType }}
@@ -294,6 +294,12 @@ Configure job or workflow `permissions` according to whether images are pushed:
 
 - **Runner Environment**: Linux GitHub Actions runner (such as `ubuntu-latest`) with Docker and `tar` available.
 - **Data Source**: Either a workflow artifact (`artifact` / `artifactId`) or a local `artifactPath` containing the archive matching `containerType` (`db.sql.gz` / `*.sql`, `media.tgz`, or `search.tgz`).
+
+## Upgrading from v1 to v2
+
+- **Minimal `FROM scratch` database images**: `mariadb` and `mysql` containers no longer include the full base OS, CLI client tools (`mariadb`/`mysql`, `mysqladmin`, `mysqldump`, `healthcheck.sh`), `bash` (on MariaDB), or upstream `docker-entrypoint.sh`. Connect over TCP/network for queries and health checks, and use `MYSQL_ENABLE_BINLOG=1` (and optional `MYSQL_SERVER_ID`) to enable `ROW`/`FULL` binary logging.
+- **Default OCI `zstd` layer compression**: Pushed images now default to `compression: zstd` with `oci-mediatypes=true`. Set `compression: gzip` if you need compatibility with Docker Engine < 23, containerd < 1.5, or registries without OCI `zstd` support.
+- **Artifact download token & cache defaults**: Artifact downloads now authenticate with `token` (default `${{ github.token }}`) instead of `password`, `cache` defaults to `'false'` instead of always enabling `type=gha`, and unpacked artifacts are cleaned up after the build rather than left in `./artifact/`.
 
 ## Related Actions
 
