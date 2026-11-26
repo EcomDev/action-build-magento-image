@@ -72,83 +72,15 @@ runs:
     - name: Validate inputs and prepare workspace
       id: prepare
       shell: bash
-      env:
-        ARTIFACT_NAME: ${{ inputs.artifact }}
-        ARTIFACT_ID: ${{ inputs.artifactId }}
-        ARTIFACT_PATH: ${{ inputs.artifactPath }}
-        CONTAINER_TYPE: ${{ inputs.containerType }}
-        VERSION: ${{ inputs.version }}
-        ENABLE_CACHE: ${{ inputs.cache }}
-        LOAD_IMAGE: ${{ inputs.load }}
       run: |
-        set -euo pipefail
-
-        case "${CONTAINER_TYPE}" in
-          mariadb|mysql|opensearch|media) ;;
-          *)
-            echo "::error::Unsupported containerType '${CONTAINER_TYPE}'. Expected one of: mariadb, mysql, opensearch, media."
-            exit 1
-            ;;
-        esac
-
-        if [[ "${CONTAINER_TYPE}" == "opensearch" && ( -z "${VERSION}" || "${VERSION}" == "none" ) ]]; then
-          echo "::notice::Skipping OpenSearch image build because 'version' is not specified."
-          {
-            echo "skip=true"
-            echo "work_dir="
-          } >> "${GITHUB_OUTPUT}"
-          exit 0
-        fi
-
-        if [[ "${CONTAINER_TYPE}" != "media" && ( -z "${VERSION}" || "${VERSION}" == "none" ) ]]; then
-          echo "::error::Input 'version' is required when containerType is '${CONTAINER_TYPE}'."
-          exit 1
-        fi
-
-        if [[ -z "${ARTIFACT_PATH}" && -z "${ARTIFACT_ID}" && -z "${ARTIFACT_NAME}" ]]; then
-          echo "::error::One of 'artifact', 'artifactId', or 'artifactPath' must be specified."
-          exit 1
-        fi
-
-        WORK_DIR="$(mktemp -d "${RUNNER_TEMP:-/tmp}/magento-image-XXXXXX")"
-        CONTEXT_DIR="${WORK_DIR}/context"
-        mkdir -p "${CONTEXT_DIR}"
-
-        if [[ -n "${ARTIFACT_PATH}" ]]; then
-          if [[ ! -d "${ARTIFACT_PATH}" ]]; then
-            echo "::error::Specified artifactPath '${ARTIFACT_PATH}' does not exist or is not a directory."
-            rm -rf "${WORK_DIR}"
-            exit 1
-          fi
-          SOURCE_DIR="$(cd "${ARTIFACT_PATH}" && pwd)"
-        else
-          SOURCE_DIR="${WORK_DIR}/download"
-          mkdir -p "${SOURCE_DIR}"
-        fi
-
-        if [[ "${ENABLE_CACHE}" != "false" ]]; then
-          CACHE_FROM="type=gha"
-          CACHE_TO="type=gha,mode=max"
-        else
-          CACHE_FROM=""
-          CACHE_TO=""
-        fi
-
-        if [[ "${LOAD_IMAGE}" != "false" ]]; then
-          PROVENANCE="false"
-        else
-          PROVENANCE="mode=max"
-        fi
-
-        {
-          echo "skip=false"
-          echo "work_dir=${WORK_DIR}"
-          echo "source_dir=${SOURCE_DIR}"
-          echo "context_dir=${CONTEXT_DIR}"
-          echo "cache_from=${CACHE_FROM}"
-          echo "cache_to=${CACHE_TO}"
-          echo "provenance=${PROVENANCE}"
-        } >> "${GITHUB_OUTPUT}"
+        "${{ github.action_path }}/scripts/prepare-workspace.sh" \
+          "${{ inputs.containerType }}" \
+          "${{ inputs.version }}" \
+          "${{ inputs.artifact }}" \
+          "${{ inputs.artifactId }}" \
+          "${{ inputs.artifactPath }}" \
+          "${{ inputs.cache }}" \
+          "${{ inputs.load }}"
 
     - name: Download artifact by ID
       if: steps.prepare.outputs.skip != 'true' && inputs.artifactPath == '' && inputs.artifactId != ''
@@ -170,41 +102,11 @@ runs:
       id: context
       if: steps.prepare.outputs.skip != 'true'
       shell: bash
-      env:
-        CONTAINER_TYPE: ${{ inputs.containerType }}
-        SOURCE_DIR: ${{ steps.prepare.outputs.source_dir }}
-        CONTEXT_DIR: ${{ steps.prepare.outputs.context_dir }}
       run: |
-        set -euo pipefail
-        shopt -s nullglob
-
-        case "${CONTAINER_TYPE}" in
-          mariadb|mysql)
-            sql_files=("${SOURCE_DIR}"/*.sql "${SOURCE_DIR}"/*.sql.gz)
-            if [[ ${#sql_files[@]} -eq 0 ]]; then
-              echo "::error::No SQL dump (*.sql or *.sql.gz) found in '${SOURCE_DIR}'."
-              exit 1
-            fi
-            cp "${sql_files[@]}" "${CONTEXT_DIR}/"
-            ;;
-          opensearch)
-            if [[ ! -f "${SOURCE_DIR}/search.tgz" ]]; then
-              echo "::notice::Skipping OpenSearch image build because 'search.tgz' was not found in '${SOURCE_DIR}'."
-              echo "skip=true" >> "${GITHUB_OUTPUT}"
-              exit 0
-            fi
-            tar xzf "${SOURCE_DIR}/search.tgz" -C "${CONTEXT_DIR}"
-            ;;
-          media)
-            if [[ ! -f "${SOURCE_DIR}/media.tgz" ]]; then
-              echo "::error::'media.tgz' not found in '${SOURCE_DIR}'."
-              exit 1
-            fi
-            tar xzf "${SOURCE_DIR}/media.tgz" -C "${CONTEXT_DIR}"
-            ;;
-        esac
-
-        echo "skip=false" >> "${GITHUB_OUTPUT}"
+        "${{ github.action_path }}/scripts/prepare-context.sh" \
+          "${{ inputs.containerType }}" \
+          "${{ steps.prepare.outputs.source_dir }}" \
+          "${{ steps.prepare.outputs.context_dir }}"
 
     - name: Set up QEMU
       if: steps.prepare.outputs.skip != 'true' && steps.context.outputs.skip != 'true'
@@ -237,6 +139,7 @@ runs:
       with:
         provenance: ${{ steps.prepare.outputs.provenance }}
         context: ${{ steps.prepare.outputs.context_dir }}
+        build-contexts: scripts=${{ github.action_path }}/scripts
         file: ${{ github.action_path }}/Dockerfile-${{ inputs.containerType }}
         push: ${{ inputs.push != 'false' }}
         load: ${{ inputs.load != 'false' }}

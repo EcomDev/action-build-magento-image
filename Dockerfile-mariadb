@@ -6,20 +6,28 @@ FROM ghcr.io/wardenenv/mariadb:${SOURCE_VERSION} AS mariadb-setup
 ENV MYSQL_DATABASE=magento \
     MYSQL_PASSWORD=magento \
     MYSQL_ROOT_PASSWORD=magento \
-    MYSQL_USER=magento
+    MYSQL_USER=magento \
+    MARIADB_INITDB_SKIP_TZINFO=1
 
-# Prevent executing server on build run
-RUN ["sed", "-i", "s/exec \\\"$@\\\"/ /", "/usr/local/bin/docker-entrypoint.sh"]
-RUN /usr/bin/install -m 0775 -o mysql -g root -d /setup/db
+COPY --from=scripts --chmod=0755 prepare-db-rootfs.sh /tmp/prepare-db-rootfs.sh
+RUN ["/tmp/prepare-db-rootfs.sh", "mariadb"]
+
 COPY *.sql* /docker-entrypoint-initdb.d/
 
-RUN ["docker-entrypoint.sh", "mariadbd", "--datadir=/setup/db", "--max-allowed-packet=1024M"]
+RUN ["docker-entrypoint.sh", "mariadbd", "--datadir=/setup/db", "--innodb-fast-shutdown=0"]
 
-FROM ghcr.io/wardenenv/mariadb:${SOURCE_VERSION}
+FROM scratch
 
-ENV MYSQL_DATABASE=magento \
+ENV PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+    MYSQL_DATABASE=magento \
     MYSQL_PASSWORD=magento \
     MYSQL_ROOT_PASSWORD=magento \
     MYSQL_USER=magento
 
-COPY --from=mariadb-setup /setup/db /var/lib/mysql
+COPY --from=mariadb-setup /rootfs /
+COPY --from=mariadb-setup --chown=mysql:mysql /setup/db /var/lib/mysql
+
+USER mysql
+EXPOSE 3306
+
+ENTRYPOINT ["mariadbd"]

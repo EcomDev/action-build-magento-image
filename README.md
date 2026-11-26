@@ -24,8 +24,8 @@ The `containerType` input selects which Dockerfile is built from the artifact da
 
 | `containerType` | Base Image | Embedded Data | Notes |
 | --- | --- | --- | --- |
-| `mariadb` | `ghcr.io/wardenenv/mariadb:<version>` | `/var/lib/mysql` | Multi-stage build importing `*.sql` / `*.sql.gz` at build time into `/setup/db` and copying the initialized data directory into the final image. |
-| `mysql` | `ghcr.io/wardenenv/mysql:<version>` | `/var/lib/mysql` | Multi-stage build importing `*.sql` / `*.sql.gz` at build time (with `--skip-log-bin`) into `/setup/db` and copying the initialized data directory into the final image. |
+| `mariadb` | `scratch` *(built from `ghcr.io/wardenenv/mariadb:<version>`)* | `/var/lib/mysql` | Minimal server-only image containing `mariadbd`, required shared libraries, `env`, and pre-initialized `/var/lib/mysql` (no shell, client tools, or anonymous `VOLUME`). |
+| `mysql` | `scratch` *(built from `ghcr.io/wardenenv/mysql:<version>`)* | `/var/lib/mysql` | Minimal server-only image containing `mysqld`, required shared libraries, `env`, and pre-initialized `/var/lib/mysql` (no shell, `mysql-shell`, client tools, or anonymous `VOLUME`). |
 | `opensearch` | `ghcr.io/wardenenv/opensearch:<version>` | `/usr/share/opensearch/data` | Replaces the OpenSearch data directory with the pre-indexed `search/` directory (`opensearch:opensearch`). Gracefully skipped (`skipped: 'true'`) when `version` is omitted/`'none'` or `search.tgz` is absent. |
 | `media` | `scratch` | `/` | Minimal data-only image containing unpacked `media/` files with ownership `1000:1000` and permissions `0777`. `version` is optional. |
 

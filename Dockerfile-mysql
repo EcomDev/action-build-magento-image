@@ -6,23 +6,30 @@ FROM ghcr.io/wardenenv/mysql:${SOURCE_VERSION} AS mysql-setup
 ENV MYSQL_DATABASE=magento \
     MYSQL_PASSWORD=magento \
     MYSQL_ROOT_PASSWORD=magento \
-    MYSQL_USER=magento
+    MYSQL_USER=magento \
+    MYSQL_INITDB_SKIP_TZINFO=1
 
 USER root
-# Prevent executing server on build run
-RUN ["sed", "-i", "s/exec \\\"$@\\\"/ /", "/usr/local/bin/docker-entrypoint.sh"]
-RUN /usr/bin/install -m 0750 -o mysql -g mysql -d /setup/db
+COPY --from=scripts --chmod=0755 prepare-db-rootfs.sh /tmp/prepare-db-rootfs.sh
+RUN ["/tmp/prepare-db-rootfs.sh", "mysql"]
 USER mysql
 
 COPY *.sql* /docker-entrypoint-initdb.d/
 
-RUN ["docker-entrypoint.sh", "mysqld", "--datadir=/setup/db", "--skip-log-bin", "--max-allowed-packet=1024M"]
+RUN ["docker-entrypoint.sh", "mysqld", "--datadir=/setup/db", "--innodb-fast-shutdown=0"]
 
-FROM ghcr.io/wardenenv/mysql:${SOURCE_VERSION}
+FROM scratch
 
-ENV MYSQL_DATABASE=magento \
+ENV PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+    MYSQL_DATABASE=magento \
     MYSQL_PASSWORD=magento \
     MYSQL_ROOT_PASSWORD=magento \
     MYSQL_USER=magento
 
-COPY --from=mysql-setup /setup/db /var/lib/mysql
+COPY --from=mysql-setup /rootfs /
+COPY --from=mysql-setup --chown=mysql:mysql /setup/db /var/lib/mysql
+
+USER mysql
+EXPOSE 3306
+
+ENTRYPOINT ["mysqld"]
